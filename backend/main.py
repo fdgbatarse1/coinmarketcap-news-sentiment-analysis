@@ -1,6 +1,11 @@
-def main():
-    print("Hello from backend!")
+from fastapi import FastAPI
+from loguru import logger
 
 
-if __name__ == "__main__":
-    main()
+app = FastAPI()
+
+
+@app.get("/")
+async def root():
+    logger.debug("That's it, beautiful and simple logging!")
+    return {"message": "Hello World"}
