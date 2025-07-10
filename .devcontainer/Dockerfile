@@ -8,11 +8,14 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     ca-certificates \
     sudo \
-    zsh 
-
+    zsh \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+    
 # Install Chrome
-RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-RUN apt-get install ./google-chrome-stable_current_amd64.deb -y
+RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+    apt-get install ./google-chrome-stable_current_amd64.deb -y && \
+    rm -f ./google-chrome-stable_current_amd64.deb
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:0.7.20 /uv /uvx /bin/
