@@ -15,6 +15,5 @@
                 "tamasfe.even-better-toml"
             ]
         }
-    },
-    "postCreateCommand": "git clone https://github.com/esauflores/dotfiles ~/.dotfiles && ~/.dotfiles/install.sh"
+    }
 }
