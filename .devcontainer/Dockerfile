@@ -34,5 +34,3 @@ RUN groupadd --gid $USER_GID $USERNAME && \
 # Set user and working directory
 USER $USERNAME
 WORKDIR /home/$USERNAME
-
-RUN 
