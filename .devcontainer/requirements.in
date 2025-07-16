@@ -21,3 +21,6 @@ webdriver-manager
 loguru
 pyarrow
 ydata_profiling
+
+openai
+tiktoken
