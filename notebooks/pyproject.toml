@@ -1,0 +1,20 @@
+[project]
+name = "coinmarketcap-news-sentiment-analysis"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "accelerate>=1.8.1",
+    "beautifulsoup4>=4.13.4",
+    "datasets>=4.0.0",
+    "jupyter>=1.1.1",
+    "loguru>=0.7.3",
+    "numpy>=2.3.1",
+    "pandas>=2.3.1",
+    "requests>=2.32.4",
+    "scikit-learn>=1.7.0",
+    "selenium>=4.34.2",
+    "torch>=2.7.1",
+    "transformers>=4.53.2",
+    "webdriver-manager>=4.0.2",
+]
