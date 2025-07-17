@@ -8,7 +8,7 @@ import os
 app = FastAPI()
 
 app.include_router(fine_tuning.router)
-model_dir =  os.path.join('..', 'models', 'finbert_bitcoin_sentiment')
+model_dir =  os.path.join('..', 'models', 'finbert_bitcoin_sentiment_pretrained')
 tokenizer = AutoTokenizer.from_pretrained(model_dir)
 model = AutoModelForSequenceClassification.from_pretrained(model_dir)
 

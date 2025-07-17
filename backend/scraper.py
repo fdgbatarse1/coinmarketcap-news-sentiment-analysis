@@ -1,15 +1,116 @@
 import time
+import os
+import psycopg2
+from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
+from transformers import AutoTokenizer
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 
+from backend.main import predict
+from backend.src.models.models import TextIn
+
+# Load environment variables from .env file
+load_dotenv()
+
+def get_db_connection():
+    """Create a connection to the PostgreSQL database."""
+    try:
+        conn = psycopg2.connect(
+            host=os.getenv("DB_HOST", "localhost"),
+            port=os.getenv("DB_PORT", "5432"),
+            database=os.getenv("DB_NAME", "crypto_news"),
+            user=os.getenv("DB_USER", "postgres"),
+            password=os.getenv("DB_PASSWORD", "postgres")
+        )
+        return conn
+    except Exception as e:
+        print(f"Database connection error: {e}")
+        return None
+
+def create_tables():
+    """Create the necessary tables if they don't exist."""
+    conn = get_db_connection()
+    if not conn:
+        return False
+
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    CREATE TABLE IF NOT EXISTS articles (
+                        id SERIAL PRIMARY KEY,
+                        url TEXT UNIQUE NOT NULL,
+                        title TEXT NOT NULL,
+                        author TEXT,
+                        assets TEXT,
+                        article_content TEXT,
+                        prediction TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+        print("✅ Database tables ready")
+        return True
+    except Exception as e:
+        print(f"Error creating tables: {e}")
+        return False
+    finally:
+        conn.close()
+
+def is_article_in_db(url):
+    """Check if an article with the given URL already exists in the database."""
+    conn = get_db_connection()
+    if not conn:
+        return False
+
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM articles WHERE url = %s", (url,))
+                return cur.fetchone() is not None
+    except Exception as e:
+        print(f"Error checking article existence: {e}")
+        return False
+    finally:
+        conn.close()
+
+def save_article_to_db(article_data):
+    """Save an article to the database."""
+    conn = get_db_connection()
+    if not conn:
+        return False
+
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute('''
+                    INSERT INTO articles (url, title, author, assets, article_content, prediction)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                ''', (
+                    article_data['url'],
+                    article_data['title'],
+                    article_data['author'],
+                    article_data['assets'],
+                    article_data['article_content'],
+                    article_data.get('prediction')  # Handle prediction if available
+                ))
+        return True
+    except Exception as e:
+        print(f"Error saving article: {e}")
+        return False
+    finally:
+        conn.close()
 
 def scrape_full_coinmarketcap_articles():
     """
     Scrapes news headlines from CoinMarketCap, then visits each article page
     to fetch the title, content, author, and associated assets using Selenium.
     """
+    # Initialize database tables
+    if not create_tables():
+        print("⚠️ Could not initialize database tables. Continuing without database functionality.")
+
     headlines_url = "https://coinmarketcap.com/headlines/news/"
 
     options = webdriver.ChromeOptions()
@@ -45,10 +146,14 @@ def scrape_full_coinmarketcap_articles():
                     full_url = href
                     if full_url.startswith("https://coinmarketcap.com"):
                         article_links.append(full_url)
-
+        article_links = list(set(article_links))
         print(f"✅ Found {len(article_links)} articles. Fetching details for the first 3 as a demo...")
-
         for url in article_links[:3]:  # Limiting to 3 for demonstration
+            # Check if article already exists in database
+            if is_article_in_db(url):
+                print(f"\n Article already saved: {url}")
+                continue
+
             print(f"\n Scraping article: {url}")
             driver.get(url)
 
@@ -72,13 +177,40 @@ def scrape_full_coinmarketcap_articles():
                 print(f"  - Assets: {asset_list if asset_list else 'No assets listed'}")
                 print(f"  - Content: {article_content[:150]}...") # Printing a snippet
 
-                all_articles_data.append({
+                article_data = {
                     'url': url,
                     'title': title,
                     'author': author,
                     'assets': asset_list,
                     'article_content': article_content
-                })
+                }
+                if is_article_in_db(url):
+                    print("  ⚠️ Article already exists in database, skipping save.")
+                    continue
+                else:
+                    model_dir = os.path.join('..', 'models', 'finbert_bitcoin_sentiment')
+                    tokenizer = AutoTokenizer.from_pretrained(model_dir)
+
+                    # Truncate the text before prediction
+                    truncated_text = tokenizer.decode(
+                        tokenizer.encode(
+                            article_data['article_content'],
+                            truncation=True,
+                            max_length=512
+                        ),
+                        skip_special_tokens=True
+                    )
+
+                    # Use the truncated text for prediction
+                    print(predict(TextIn(text=truncated_text)).label)
+                    article_data["prediction"] = predict(TextIn(text=truncated_text)).label
+                all_articles_data.append(article_data)
+
+                # Save new article to database
+                if save_article_to_db(article_data):
+                    print("  ✅ New article saved to database")
+                else:
+                    print("  ⚠️ Failed to save article to database")
 
             except Exception as e:
                 print(f"  ❌ Could not process article {url}. Reason: {e}")
@@ -90,5 +222,6 @@ def scrape_full_coinmarketcap_articles():
 
 
 
-scraped_data = scrape_full_coinmarketcap_articles()
-print("\n--- Scraping Complete ---")
+if __name__ == "__main__":
+    scraped_data = scrape_full_coinmarketcap_articles()
+    print("\n--- Scraping Complete ---")
