@@ -1,0 +1,2 @@
+# ignore all csv, keep only parquet files
+*.csv
